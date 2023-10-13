@@ -21,6 +21,8 @@ int main(void) {
     char* argv[3];
     char buf[512];
     int fd0, fd1, fd2;
+    int status; // exit status of child process
+    pid_t wpid; //return value of waitpid
 
     fd = open("./crontab", O_RDWR);
     if (errno == ENOENT) {
@@ -52,24 +54,84 @@ int main(void) {
     fd1 = open("/dev/null", O_RDWR);
     fd2 = open("/dev/null", O_RDWR);
 
-    t = time(NULL);
-    tm = localtime(&t);
+    ssize_t res; //result of read function
+    char* tmp; //temporary pointer of buf
+    char* token;
+    
+    if((res = read(fd, buf, sizeof(buf))) < 0){
+	perror("crontab reading error");
+	exit(4);
+    }
+    tmp = buf;
+    
+    int i = 0;
+    //reading and saving arguments
+    while((token = strtok_r(tmp, " ", &tmp))){
+	*(argv+i) = token;
+	i++;
+    }
+
+    int min = -1;
+    int hour = -1;
+
+    if(*argv[0]!='*')
+	    min = strtol(argv[0], NULL, 10);
+    if(*argv[1]!='*')
+	    hour = strtol(argv[1], NULL, 10);
+
+    
 
     while (1) {
-        buf[0] = '\0';
-
-        // insert your code
-
-        //##  hints  ##
-
-        // strtok_r();
-        // pid = fork();
-        // execl("/bin/sh", "/bin/sh", "-c", argv[2], (char*) NULL);
-
-        t = time(NULL);
-        tm = localtime(&t);
-
+	t = time(NULL);
+	tm = localtime(&t);
+	
+        if(min==-1 && hour==-1){
+	    pid = fork();
+	    if(pid == 0){
+		if(execl("/bin/sh", "/bin/sh", "-c", argv[2], (char*)NULL)==-1){
+		    exit(5);
+		}
+		exit(0);
+	    }	
+	}
+	else if(min==-1){
+		if(hour == tm->tm_hour){
+		    pid = fork();
+		    if(pid == 0){
+	                if(execl("/bin/sh", "/bin/sh", "-c", argv[2], (char*)NULL)==-1){
+		    	    exit(5);
+			}
+			exit(0);
+	    	    }
+		}
+	}else if(hour==-1){
+		if(min == tm->tm_min){
+		    pid = fork();
+	    	    if(pid == 0){
+	 	        if(execl("/bin/sh", "/bin/sh", "-c", argv[2], (char*)NULL)==-1){
+		    	    exit(5);
+			}
+		        exit(0);
+	    	    } 
+		}
+	}else{
+		if(hour==tm->tm_hour && min==tm->tm_min){
+		    pid = fork();
+	    	    if(pid == 0){
+		    	if(execl("/bin/sh", "/bin/sh", "-c", argv[2], (char*)NULL)==-1){
+			    exit(5);
+			}
+			exit(0);
+		    }	    
+		}
+	}
+	
         sleep(60 - tm->tm_sec % 60);
+
+	wpid = waitpid(pid, &status, WNOHANG);
+	if(wpid > 0){
+	    if(status==5) exit(1); //if child process exited with error, then terminate cron
+	}
     }
 
     return 0;
