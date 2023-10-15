@@ -21,10 +21,14 @@ int main(void) {
     char* argv[3];
     char buf[512];
     int fd0, fd1, fd2;
+    
     int status; // exit status of child process
     pid_t wpid; //return value of waitpid
-
+    ssize_t res; //result of read function
+    char* tmp; //temporary pointer of buf
+    char* token;
     fd = open("./crontab", O_RDWR);
+    
     if (errno == ENOENT) {
         perror("crontab does not exist");
         exit(1);
@@ -54,12 +58,10 @@ int main(void) {
     fd1 = open("/dev/null", O_RDWR);
     fd2 = open("/dev/null", O_RDWR);
 
-    ssize_t res; //result of read function
-    char* tmp; //temporary pointer of buf
-    char* token;
+    openlog("cron", LOG_PID, LOG_CRON);
     
     if((res = read(fd, buf, sizeof(buf))) < 0){
-	perror("crontab reading error");
+	syslog(LOG_EMERG, "crontab reading errer")
 	exit(4);
     }
     tmp = buf;
